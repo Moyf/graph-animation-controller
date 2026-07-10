@@ -83,6 +83,42 @@ export class GraphEngineController {
     void engine.renderProgression()
   }
 
+  setProgressByTimestamp(engine: GraphDataEngine, targetMs: number): void {
+    const nodes = engine.renderer.nodes
+    if (nodes.length === 0) return
+    const maxProgression = this.#readMaxProgression(engine)
+
+    // Find the node whose file timestamp is closest to targetMs
+    let bestIndex = 0
+    let bestDelta = Infinity
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i]
+      if (!node) continue
+      const file = this.#app.vault.getAbstractFileByPath(node.id)
+      if (!isTFileLike(file)) continue
+      const ts = Math.min(file.stat.ctime, file.stat.mtime)
+      const delta = Math.abs(ts - targetMs)
+      if (delta < bestDelta) {
+        bestDelta = delta
+        bestIndex = i
+      }
+    }
+
+    // Convert node index → progression value (mirrors getDateSnapshot ratio logic, inverted)
+    const ratio = nodes.length > 1 ? bestIndex / (nodes.length - 1) : 0
+    const next = Math.max(1, Math.round(1 + (maxProgression - 1) * ratio))
+    const wasPaused = engine._graphAnimationControllerPaused === true || engine.progression <= 0
+    engine.progression = next
+    engine._graphAnimationControllerResumeFrom = next
+    engine.render()
+    if (wasPaused) {
+      engine._graphAnimationControllerPaused = true
+      return
+    }
+    engine._graphAnimationControllerPaused = false
+    void engine.renderProgression()
+  }
+
   setProgressPercent(engine: GraphDataEngine, progressPercent: number): void {
     const wasPaused = engine._graphAnimationControllerPaused === true || engine.progression <= 0
     const maxProgression = this.#readMaxProgression(engine)

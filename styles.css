@@ -112,6 +112,7 @@
   background: var(--background-modifier-hover);
 }
 
+/* Speed popover sits above the big progress bar */
 .graph-animation-controller-popover {
   position: absolute;
   right: -10px;
@@ -123,6 +124,7 @@
   border-radius: 8px;
   background: var(--background-primary);
   box-shadow: var(--shadow-l);
+  z-index: 25;
 }
 
 .graph-animation-controller-popover.is-open {
@@ -284,139 +286,144 @@
 
 /* ── Big progress bar ─────────────────────────────────────────────────── */
 
+/* Floating pill — same aesthetic as the small controls toolbar.
+   z-index:15 keeps it below controls (z-index:20) so the speed popover isn't clipped. */
 .graph-animation-controller-big-bar {
   position: absolute;
-  left: 0;
-  right: 0;
-  /* sit just above the small controls toolbar (bottom: 12px, height ~36px) */
-  bottom: 56px;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 12px 10px;
+  left: 50%;
+  bottom: 72px;
+  z-index: 15;
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 720px;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
   background: var(--background-primary);
-  border-top: 1px solid var(--background-modifier-border);
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-s);
 }
 
-/* Track row */
-.graph-animation-controller-big-bar-track-row {
+/* Single row: [track……………………] [percent] */
+.graph-animation-controller-big-bar-row {
   display: flex;
   align-items: center;
+  gap: 8px;
 }
 
+/* Progress track
+   Use padding to create a tall hit area while keeping the visual groove thin.
+   No flex/::before tricks — just a plain block with explicit height so the
+   range input's absolute positioning gets the full 20px to work with. */
 .graph-animation-controller-big-bar-track {
   position: relative;
   flex: 1 1 auto;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--background-modifier-border);
+  height: 20px;          /* hit area height — range input fills this */
   cursor: pointer;
 }
 
-.graph-animation-controller-big-bar-track:hover {
+/* Visual groove: a thin bar centered inside the hit area via top/transform */
+.graph-animation-controller-big-bar-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  border-radius: 2px;
+  background: var(--background-modifier-border);
+  pointer-events: none;
+  transition: height 80ms ease;
+}
+
+.graph-animation-controller-big-bar-track:hover::before {
   height: 6px;
-  margin-top: -1px;
-  margin-bottom: -1px;
 }
 
 .graph-animation-controller-big-bar-fill {
   position: absolute;
-  inset: 0 auto 0 0;
+  left: 0;
+  right: auto;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
   border-radius: 2px;
   background: var(--interactive-accent);
+  width: 0%;
   pointer-events: none;
+  transition: height 80ms ease;
 }
 
-/* The range input is stretched over the visual track for native drag/click */
+.graph-animation-controller-big-bar-track:hover .graph-animation-controller-big-bar-fill {
+  height: 6px;
+}
+
+/* Range input: covers the full 20px hit area so both click and drag work.
+   !important on height/width overrides Obsidian's global input[type=range] rule
+   which sets height: var(--slider-track-height) = 4px. */
 .graph-animation-controller-big-bar-input {
   position: absolute;
-  inset: -8px 0;
-  width: 100%;
-  height: calc(100% + 16px);
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 20px;
   opacity: 0;
   cursor: pointer;
   margin: 0;
+  padding: 0;
 }
 
-/* Controls row */
-.graph-animation-controller-big-bar-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-}
-
-.graph-animation-controller-big-bar-left {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.graph-animation-controller-big-bar-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.graph-animation-controller-big-bar-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  color: var(--icon-color);
-  cursor: pointer;
-}
-
-.graph-animation-controller-big-bar-button:hover,
-.graph-animation-controller-big-bar-button:focus-visible {
-  color: var(--icon-color-hover);
-  background: var(--background-modifier-hover);
-}
-
-.graph-animation-controller-big-bar-time {
-  margin-left: 6px;
-  color: var(--text-muted);
-  font-family: var(--font-monospace);
-  font-size: var(--font-ui-smaller);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-/* Editable percent on the right */
+/* Percent wrap: fixed-size box — span and input are both absolutely positioned
+   inside it so toggling visibility never shifts the row height.
+   Height matches Obsidian's input height (22px) so the input fits exactly. */
 .graph-animation-controller-big-bar-percent-wrap {
-  display: flex;
-  align-items: center;
+  flex: 0 0 auto;
+  position: relative;
+  width: 40px;
+  height: 22px;
 }
 
 .graph-animation-controller-big-bar-percent-value {
-  color: var(--text-normal);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: var(--text-muted);
   font-size: var(--font-ui-smaller);
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   cursor: text;
-  min-width: 36px;
-  text-align: right;
+  white-space: nowrap;
+  visibility: visible;
+}
+
+.graph-animation-controller-big-bar-percent-value:hover {
+  color: var(--text-normal);
 }
 
 .graph-animation-controller-big-bar-percent-input {
-  display: none;
-  width: 44px;
-  height: 22px;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;          /* fills the 22px wrap exactly */
+  padding: 0 4px;        /* override Obsidian's 4px 8px default */
+  box-sizing: border-box;
   text-align: right;
+  font-size: var(--font-ui-smaller);
+  visibility: hidden;
 }
 
 .graph-animation-controller-big-bar-percent-input.is-invalid {
   border-color: var(--text-error);
 }
 
+/* Toggle: hide span, show input — no layout shift because both are absolutely positioned */
 .graph-animation-controller-big-bar.is-editing-percent .graph-animation-controller-big-bar-percent-value {
-  display: none;
+  visibility: hidden;
 }
 
 .graph-animation-controller-big-bar.is-editing-percent .graph-animation-controller-big-bar-percent-input {
-  display: inline-block;
+  visibility: visible;
 }
