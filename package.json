@@ -1,0 +1,30 @@
+{
+  "name": "graph-animation-controller",
+  "version": "0.1.0",
+  "description": "Playback controls and date overlays for Obsidian graph timelapse animation.",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "build:local": "npm run build && npm run copy-to-local",
+    "copy-to-local": "node scripts/copy-to-local.mjs"
+  },
+  "keywords": [
+    "obsidian",
+    "graph",
+    "timelapse",
+    "animation"
+  ],
+  "author": "Moyf",
+  "license": "MIT",
+  "dependencies": {
+    "tslib": "^2.6.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.23.0",
+    "obsidian": "^1.8.7",
+    "typescript": "^5.5.3"
+  }
+}

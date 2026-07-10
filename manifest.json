@@ -1,0 +1,9 @@
+{
+  "id": "graph-animation-controller",
+  "name": "Graph Animation Controller",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Adds speed, seek, pause/resume controls, and configurable date overlays to graph timelapse animation.",
+  "author": "Moyf",
+  "isDesktopOnly": true
+}
