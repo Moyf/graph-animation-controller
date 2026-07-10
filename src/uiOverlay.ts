@@ -61,6 +61,7 @@ export function updateOverlay(
   rootEl: HTMLElement,
   snapshot: DateSnapshot | null,
   settings: GraphAnimationControllerSettings,
+  bigProgressBarOpen: boolean,
 ): void {
   applyRootStyle(rootEl, settings)
   applyOverlayStyle(overlay.overlayEl, overlay.positionPopoverEl, settings.datePosition)
@@ -76,6 +77,7 @@ export function updateOverlay(
   overlay.dateEl.setText(`${prefix}${formatDate(snapshot.timestamp, settings.dateFormat)}`)
   overlay.percentEl.setText(`${snapshot.progressPercent}%`)
   overlay.percentEl.toggle(settings.showProgressPercent)
+  overlay.percentEl.toggleClass("is-active", bigProgressBarOpen)
   overlay.progressionSliderEl.value = String(snapshot.progressPercent)
   if (overlay.progressionValueEl.textContent !== `${snapshot.progressPercent}%`) {
     overlay.progressionValueEl.setText(`${snapshot.progressPercent}%`)

@@ -1,6 +1,7 @@
 import type { WorkspaceLeaf } from "obsidian"
 import { createControls, type GraphControls } from "./uiControls"
 import { createOverlay, updateOverlay } from "./uiOverlay"
+import { createBigProgressBar, type BigProgressBar } from "./uiProgressBar"
 import type { GraphEngineController } from "./graphEngine"
 import type { DatePosition, GraphAnimationControllerApi, GraphDataEngine } from "./types"
 import { readGraphEngine, readUnknownProperty } from "./types"
@@ -11,8 +12,10 @@ type GraphUiRecord = {
   readonly rootEl: HTMLElement
   readonly controls: GraphControls
   readonly overlay: ReturnType<typeof createOverlay>
+  readonly bigProgressBar: BigProgressBar
   readonly intervalId: number
   lastState: string
+  bigProgressBarOpen: boolean
 }
 
 const UPDATE_INTERVAL_MS = 250
@@ -42,16 +45,77 @@ export class GraphUiController {
     this.#engineController.patchEngine(engine)
     const overlay = createOverlay(rootEl)
     const controls = createControls(rootEl)
+    const bigProgressBar = createBigProgressBar(rootEl)
+
     const record: GraphUiRecord = {
       leaf,
       engine,
       rootEl,
       controls,
       overlay,
+      bigProgressBar,
       intervalId: window.setInterval(() => this.refreshLeaf(leaf), UPDATE_INTERVAL_MS),
       lastState: "",
+      bigProgressBarOpen: false,
     }
 
+    // --- Overlay wiring ---
+    // dateEl: open position popover (original behaviour)
+    overlay.dateEl.onClickEvent(() => {
+      overlay.positionPopoverEl.toggleClass("is-open", !overlay.positionPopoverEl.hasClass("is-open"))
+      releaseFocus(overlay.dateEl)
+    })
+    // percentEl: toggle big progress bar
+    overlay.percentEl.onClickEvent(() => {
+      record.bigProgressBarOpen = !record.bigProgressBarOpen
+      record.bigProgressBar.barEl.toggle(record.bigProgressBarOpen)
+      record.lastState = ""
+      this.refreshLeaf(leaf)
+      releaseFocus(overlay.percentEl)
+    })
+    rootEl.addEventListener("pointerdown", (event) => {
+      const target = event.target
+      if (!(target instanceof Node)) {
+        return
+      }
+      if (overlay.overlayEl.contains(target) || overlay.positionPopoverEl.contains(target)) {
+        return
+      }
+      overlay.positionPopoverEl.removeClass("is-open")
+    })
+    overlay.progressionSliderEl.addEventListener("input", () => {
+      const percent = Number.parseInt(overlay.progressionSliderEl.value, 10)
+      this.#engineController.setProgressPercent(engine, percent)
+      this.refreshLeaf(leaf)
+    })
+    overlay.progressionValueEl.onClickEvent(() => {
+      overlay.positionPopoverEl.addClass("is-editing-progression")
+      overlay.progressionInputEl.focus()
+      overlay.progressionInputEl.select()
+    })
+    overlay.progressionInputEl.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        this.#commitProgressionInput(overlay, engine, leaf)
+      }
+      if (event.key === "Escape") {
+        overlay.positionPopoverEl.removeClass("is-editing-progression")
+        this.refreshLeaf(leaf)
+      }
+    })
+    overlay.progressionInputEl.addEventListener("blur", () => this.#commitProgressionInput(overlay, engine, leaf))
+    for (const button of overlay.positionButtonEls) {
+      button.onClickEvent(() => {
+        const position = button.dataset.position
+        if (!isDatePosition(position)) {
+          return
+        }
+        void this.#api.saveSettings({ ...this.#api.getSettings(), datePosition: position })
+        this.#api.applySettings()
+        releaseFocus(button)
+      })
+    }
+
+    // --- Small controls wiring ---
     controls.replayButtonEl.onClickEvent(() => {
       this.#engineController.replay(engine)
       this.refreshLeaf(leaf)
@@ -107,51 +171,55 @@ export class GraphUiController {
       this.refreshLeaf(leaf)
       releaseFocus(controls.speedResetButtonEl)
     })
-    overlay.overlayEl.onClickEvent(() => {
-      overlay.positionPopoverEl.toggleClass("is-open", !overlay.positionPopoverEl.hasClass("is-open"))
-      releaseFocus(overlay.overlayEl)
+
+    // --- Big progress bar wiring ---
+    bigProgressBar.replayButtonEl.onClickEvent(() => {
+      this.#engineController.replay(engine)
+      this.refreshLeaf(leaf)
+      releaseFocus(bigProgressBar.replayButtonEl)
     })
-    rootEl.addEventListener("pointerdown", (event) => {
-      const target = event.target
-      if (!(target instanceof Node)) {
-        return
-      }
-      if (overlay.overlayEl.contains(target) || overlay.positionPopoverEl.contains(target)) {
-        return
-      }
-      overlay.positionPopoverEl.removeClass("is-open")
+    bigProgressBar.backButtonEl.onClickEvent(() => {
+      this.#engineController.seek(engine, -1, this.#api.getSettings().seekStepPercent)
+      this.refreshLeaf(leaf)
+      releaseFocus(bigProgressBar.backButtonEl)
     })
-    overlay.progressionSliderEl.addEventListener("input", () => {
-      const percent = Number.parseInt(overlay.progressionSliderEl.value, 10)
+    bigProgressBar.playButtonEl.onClickEvent(() => {
+      if (engine._graphAnimationControllerPaused !== true && engine.progression > 0) {
+        this.#engineController.pause(engine)
+      } else {
+        this.#engineController.play(engine)
+      }
+      this.refreshLeaf(leaf)
+      releaseFocus(bigProgressBar.playButtonEl)
+    })
+    bigProgressBar.forwardButtonEl.onClickEvent(() => {
+      this.#engineController.seek(engine, 1, this.#api.getSettings().seekStepPercent)
+      this.refreshLeaf(leaf)
+      releaseFocus(bigProgressBar.forwardButtonEl)
+    })
+    bigProgressBar.progressInputEl.addEventListener("input", () => {
+      const percent = Number.parseInt(bigProgressBar.progressInputEl.value, 10)
       this.#engineController.setProgressPercent(engine, percent)
       this.refreshLeaf(leaf)
     })
-    overlay.progressionValueEl.onClickEvent(() => {
-      overlay.positionPopoverEl.addClass("is-editing-progression")
-      overlay.progressionInputEl.focus()
-      overlay.progressionInputEl.select()
+    // Right-side editable percent
+    bigProgressBar.percentValueEl.onClickEvent(() => {
+      bigProgressBar.barEl.addClass("is-editing-percent")
+      bigProgressBar.percentInputEl.focus()
+      bigProgressBar.percentInputEl.select()
     })
-    overlay.progressionInputEl.addEventListener("keydown", (event) => {
+    bigProgressBar.percentInputEl.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
-        this.#commitProgressionInput(overlay, engine, leaf)
+        this.#commitBigBarPercentInput(bigProgressBar, engine, leaf)
       }
       if (event.key === "Escape") {
-        overlay.positionPopoverEl.removeClass("is-editing-progression")
+        bigProgressBar.barEl.removeClass("is-editing-percent")
         this.refreshLeaf(leaf)
       }
     })
-    overlay.progressionInputEl.addEventListener("blur", () => this.#commitProgressionInput(overlay, engine, leaf))
-    for (const button of overlay.positionButtonEls) {
-      button.onClickEvent(() => {
-        const position = button.dataset.position
-        if (!isDatePosition(position)) {
-          return
-        }
-        void this.#api.saveSettings({ ...this.#api.getSettings(), datePosition: position })
-        this.#api.applySettings()
-        releaseFocus(button)
-      })
-    }
+    bigProgressBar.percentInputEl.addEventListener("blur", () =>
+      this.#commitBigBarPercentInput(bigProgressBar, engine, leaf),
+    )
 
     this.#records.set(leaf, record)
     this.refreshLeaf(leaf)
@@ -187,13 +255,15 @@ export class GraphUiController {
       timestamp: snapshot?.timestamp ?? null,
       progressPercent: snapshot?.progressPercent ?? null,
       isPlaying,
+      bigProgressBarOpen: record.bigProgressBarOpen,
     })
     if (record.lastState === state) {
       return
     }
     record.lastState = state
     record.controls.render(settings, isPlaying)
-    updateOverlay(record.overlay, record.rootEl, snapshot, settings)
+    record.bigProgressBar.render(settings, snapshot, isPlaying)
+    updateOverlay(record.overlay, record.rootEl, snapshot, settings, record.bigProgressBarOpen)
   }
 
   removeLeaf(leaf: WorkspaceLeaf): void {
@@ -205,6 +275,7 @@ export class GraphUiController {
     record.overlay.overlayEl.remove()
     record.overlay.positionPopoverEl.remove()
     record.controls.controlsEl.remove()
+    record.bigProgressBar.barEl.remove()
     this.#records.delete(leaf)
   }
 
@@ -240,6 +311,19 @@ export class GraphUiController {
     const next = Math.min(Math.max(parsed, 0), 100)
     overlay.progressionInputEl.removeClass("is-invalid")
     overlay.positionPopoverEl.removeClass("is-editing-progression")
+    this.#engineController.setProgressPercent(engine, next)
+    this.refreshLeaf(leaf)
+  }
+
+  #commitBigBarPercentInput(bigProgressBar: BigProgressBar, engine: GraphDataEngine, leaf: WorkspaceLeaf): void {
+    const parsed = Number.parseInt(bigProgressBar.percentInputEl.value, 10)
+    if (!Number.isFinite(parsed)) {
+      bigProgressBar.percentInputEl.addClass("is-invalid")
+      return
+    }
+    const next = Math.min(Math.max(parsed, 0), 100)
+    bigProgressBar.percentInputEl.removeClass("is-invalid")
+    bigProgressBar.barEl.removeClass("is-editing-percent")
     this.#engineController.setProgressPercent(engine, next)
     this.refreshLeaf(leaf)
   }
