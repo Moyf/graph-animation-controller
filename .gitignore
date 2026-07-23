@@ -4,3 +4,4 @@ dist/
 .hotreload
 .qa-ob-eval.js
 *.log
+/.omo
