@@ -57,7 +57,7 @@ Keyboard controls are disabled by default. Enable them in the plugin settings be
 | `R` | Replay from the beginning |
 | `Q` | Seek backward |
 | `E` | Seek forward |
-| `W` | Show or hide the timeline and position menu |
+| `W` | Show or hide the large progress bar above the toolbar |
 
 Shortcuts only apply while the global graph view is active. They are ignored while typing in inputs and other editable controls.
 

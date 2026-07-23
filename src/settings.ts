@@ -69,6 +69,17 @@ export class GraphAnimationSettingTab extends PluginSettingTab {
           .setValue(this.#plugin.settings.showReplayButton)
           .onChange((value) => this.#updateSetting("showReplayButton", value)),
       )
+
+    new Setting(containerEl)
+      .setName("Enable keyboard shortcuts")
+      .setDesc(
+        "Play/pause with Space, replay with R, seek backward with Q, seek forward with E, and toggle the progress bar with W. Only active while the global graph view is focused.",
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.#plugin.settings.enableKeyboardShortcuts)
+          .onChange((value) => this.#updateSetting("enableKeyboardShortcuts", value)),
+      )
   }
 
   #addDateSettings(containerEl: HTMLElement): void {

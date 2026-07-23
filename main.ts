@@ -1,6 +1,7 @@
 import { Plugin, debounce } from "obsidian"
 import { GraphEngineController, getGraphLeaves } from "./src/graphEngine"
 import { GraphUiController } from "./src/graphUi"
+import { assertNever, readGraphKeyboardContextResult } from "./src/keyboardShortcuts"
 import { GraphAnimationSettingTab } from "./src/settings"
 import {
   DATE_FORMATS,
@@ -26,6 +27,7 @@ export default class GraphAnimationControllerPlugin extends Plugin {
     const sync = debounce(() => this.syncGraphLeaves(), 200, true)
     this.registerEvent(this.app.workspace.on("layout-change", sync))
     this.registerEvent(this.app.workspace.on("active-leaf-change", sync))
+    this.registerDomEvent(activeDocument, "keydown", (event) => this.#handleGraphKeyboardShortcut(event))
     this.app.workspace.onLayoutReady(() => this.syncGraphLeaves())
   }
 
@@ -60,6 +62,31 @@ export default class GraphAnimationControllerPlugin extends Plugin {
   async loadSettings(): Promise<void> {
     this.settings = normalizeSettings(await this.loadData())
   }
+
+  #handleGraphKeyboardShortcut(event: KeyboardEvent): void {
+    const leaf = this.app.workspace.activeLeaf
+    const result = readGraphKeyboardContextResult(
+      {
+        enabled: this.settings.enableKeyboardShortcuts,
+        activeViewType: leaf?.getViewState().type,
+      },
+      event,
+    )
+    switch (result.kind) {
+      case "ignored":
+        return
+      case "consumed":
+        event.preventDefault()
+        return
+      case "action":
+        if (leaf && this.#uiController?.handleKeyboardAction(leaf, result.action)) {
+          event.preventDefault()
+        }
+        return
+      default:
+        assertNever(result)
+    }
+  }
 }
 
 function normalizeSettings(settings: unknown): GraphAnimationControllerSettings {
@@ -74,6 +101,11 @@ function normalizeSettings(settings: unknown): GraphAnimationControllerSettings 
       20,
     ),
     showReplayButton: readBoolean(settings, "showReplayButton", DEFAULT_SETTINGS.showReplayButton),
+    enableKeyboardShortcuts: readBoolean(
+      settings,
+      "enableKeyboardShortcuts",
+      DEFAULT_SETTINGS.enableKeyboardShortcuts,
+    ),
     dateFormat: readDateFormat(settings),
     datePosition: readDatePosition(settings),
     showProgressPercent: readBoolean(settings, "showProgressPercent", DEFAULT_SETTINGS.showProgressPercent),

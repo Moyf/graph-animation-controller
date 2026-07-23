@@ -25,6 +25,7 @@ export type GraphAnimationControllerSettings = {
   readonly seekStepPercent: number
   readonly progressionSliderStepPercent: number
   readonly showReplayButton: boolean
+  readonly enableKeyboardShortcuts: boolean
   readonly dateFormat: DateFormat
   readonly datePosition: DatePosition
   readonly showProgressPercent: boolean
@@ -43,6 +44,7 @@ export const DEFAULT_SETTINGS: GraphAnimationControllerSettings = {
   seekStepPercent: 10,
   progressionSliderStepPercent: 5,
   showReplayButton: true,
+  enableKeyboardShortcuts: false,
   dateFormat: "iso",
   datePosition: "bottomLeft",
   showProgressPercent: true,

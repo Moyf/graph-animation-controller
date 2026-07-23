@@ -1,8 +1,10 @@
 import type { WorkspaceLeaf } from "obsidian"
+import { bindGraphActionButtons, createGraphActionExecutor, type GraphActionExecutor } from "./graphActions"
 import { createControls, type GraphControls } from "./uiControls"
 import { createOverlay, updateOverlay } from "./uiOverlay"
 import { createBigProgressBar, type BigProgressBar } from "./uiProgressBar"
 import type { GraphEngineController } from "./graphEngine"
+import type { GraphKeyboardAction } from "./keyboardShortcuts"
 import type { DatePosition, GraphAnimationControllerApi, GraphDataEngine } from "./types"
 import { readGraphEngine, readUnknownProperty } from "./types"
 
@@ -24,11 +26,13 @@ const UPDATE_INTERVAL_MS = 250
 export class GraphUiController {
   readonly #api: GraphAnimationControllerApi
   readonly #engineController: GraphEngineController
+  readonly #actions: GraphActionExecutor
   readonly #records = new Map<WorkspaceLeaf, GraphUiRecord>()
 
   constructor(api: GraphAnimationControllerApi, engineController: GraphEngineController) {
     this.#api = api
     this.#engineController = engineController
+    this.#actions = createGraphActionExecutor(api, engineController)
   }
 
   syncLeaf(leaf: WorkspaceLeaf): void {
@@ -68,10 +72,7 @@ export class GraphUiController {
       releaseFocus(overlay.dateEl)
     })
     overlay.percentEl.onClickEvent(() => {
-      record.bigProgressBarOpen = !record.bigProgressBarOpen
-      record.bigProgressBar.barEl.toggle(record.bigProgressBarOpen)
-      record.lastState = ""
-      this.refreshLeaf(leaf)
+      this.#toggleBigProgressBar(record)
       releaseFocus(overlay.percentEl)
     })
     const handleRootPointerDown = (event: PointerEvent): void => {
@@ -110,30 +111,7 @@ export class GraphUiController {
     }
 
     // --- Small controls wiring ---
-    controls.replayButtonEl.onClickEvent(() => {
-      this.#engineController.replay(engine)
-      this.refreshLeaf(leaf)
-      releaseFocus(controls.replayButtonEl)
-    })
-    controls.backButtonEl.onClickEvent(() => {
-      this.#engineController.seek(engine, -1, this.#api.getSettings().seekStepPercent)
-      this.refreshLeaf(leaf)
-      releaseFocus(controls.backButtonEl)
-    })
-    controls.playButtonEl.onClickEvent(() => {
-      if (engine._graphAnimationControllerPaused !== true && engine.progression > 0) {
-        this.#engineController.pause(engine)
-      } else {
-        this.#engineController.play(engine)
-      }
-      this.refreshLeaf(leaf)
-      releaseFocus(controls.playButtonEl)
-    })
-    controls.forwardButtonEl.onClickEvent(() => {
-      this.#engineController.seek(engine, 1, this.#api.getSettings().seekStepPercent)
-      this.refreshLeaf(leaf)
-      releaseFocus(controls.forwardButtonEl)
-    })
+    bindGraphActionButtons({ controls, run: (action) => this.#runGraphAction(record, action) })
     controls.speedButtonEl.onClickEvent(() => {
       controls.speedPopoverEl.toggleClass("is-open", !controls.speedPopoverEl.hasClass("is-open"))
       releaseFocus(controls.speedButtonEl)
@@ -163,7 +141,6 @@ export class GraphUiController {
       this.refreshLeaf(leaf)
       releaseFocus(controls.speedResetButtonEl)
     })
-
     // --- Big progress bar wiring ---
 
     let resumeAfterScrub = false
@@ -228,6 +205,17 @@ export class GraphUiController {
     }
   }
 
+  handleKeyboardAction(leaf: WorkspaceLeaf, action: GraphKeyboardAction): boolean {
+    if (leaf.getViewState().type !== "graph") {
+      return false
+    }
+    this.syncLeaf(leaf)
+    const record = this.#records.get(leaf)
+    if (!record) return false
+    this.#runGraphAction(record, action)
+    return true
+  }
+
   refreshLeaf(leaf: WorkspaceLeaf): void {
     const record = this.#records.get(leaf)
     if (!record) return
@@ -277,6 +265,24 @@ export class GraphUiController {
     controls.speedLabelEl.removeClass("is-editing")
     void this.#api.saveSettings({ ...this.#api.getSettings(), speedMultiplier: next })
     this.#api.applySettings()
+  }
+
+  #runGraphAction(record: GraphUiRecord, action: GraphKeyboardAction): void {
+    this.#actions.run(
+      {
+        engine: record.engine,
+        refresh: () => this.refreshLeaf(record.leaf),
+        toggleBigProgressBar: () => this.#toggleBigProgressBar(record),
+      },
+      action,
+    )
+  }
+
+  #toggleBigProgressBar(record: GraphUiRecord): void {
+    record.bigProgressBarOpen = !record.bigProgressBarOpen
+    record.bigProgressBar.barEl.toggle(record.bigProgressBarOpen)
+    record.lastState = ""
+    this.refreshLeaf(record.leaf)
   }
 
   #commitProgressionInput(
