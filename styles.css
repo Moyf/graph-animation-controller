@@ -74,6 +74,11 @@
   background: var(--background-secondary-alt);
 }
 
+.graph-animation-controller-overlay.is-hero .graph-animation-controller-overlay-percent:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
 .graph-animation-controller-overlay.is-hero:hover {
   filter: drop-shadow(0 0 18px var(--background-modifier-accent));
   opacity: min(calc(var(--graph-animation-controller-date-opacity, 1) + 0.12), 1);
@@ -132,12 +137,17 @@
 }
 
 .graph-animation-controller-speed-label {
+  position: relative;
   flex: 1 1 auto;
+  min-height: 22px;
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
 }
 
 .graph-animation-controller-speed-value {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
   color: var(--text-normal);
   cursor: text;
   font-weight: 700;
@@ -146,8 +156,13 @@
 .graph-animation-controller-speed-input {
   display: none;
   width: 54px;
-  height: 22px;
+  height: 22px !important;
+  min-height: 0 !important;
   margin-left: 4px;
+  padding: 0 6px !important;
+  box-sizing: border-box;
+  line-height: 20px;
+  vertical-align: middle;
 }
 
 .graph-animation-controller-speed-input.is-invalid {
@@ -160,6 +175,9 @@
 
 .graph-animation-controller-speed-label.is-editing .graph-animation-controller-speed-input {
   display: inline-block;
+  height: 22px !important;
+  min-height: 0 !important;
+  line-height: 20px;
 }
 
 .graph-animation-controller-speed-header {
@@ -229,20 +247,35 @@
 
 .graph-animation-controller-progression-value-wrap {
   flex: 0 0 44px;
+  position: relative;
+  height: 22px;
 }
 
 .graph-animation-controller-progression-value {
-  display: inline-block;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   color: var(--text-normal);
   font-size: var(--font-ui-smaller);
   font-weight: 700;
   cursor: text;
+  visibility: visible;
 }
 
 .graph-animation-controller-progression-input {
-  display: none;
-  width: 44px;
-  height: 22px;
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 22px !important;
+  min-height: 0 !important;
+  padding: 0 6px !important;
+  box-sizing: border-box;
+  line-height: 20px;
+  text-align: right;
+  visibility: hidden;
 }
 
 .graph-animation-controller-progression-input.is-invalid {
@@ -250,11 +283,11 @@
 }
 
 .graph-animation-controller-position-popover.is-editing-progression .graph-animation-controller-progression-value {
-  display: none;
+  visibility: hidden;
 }
 
 .graph-animation-controller-position-popover.is-editing-progression .graph-animation-controller-progression-input {
-  display: inline-block;
+  visibility: visible;
 }
 
 .graph-animation-controller-position-grid {
@@ -310,68 +343,12 @@
   gap: 8px;
 }
 
-/* Progress track
-   Use padding to create a tall hit area while keeping the visual groove thin.
-   No flex/::before tricks — just a plain block with explicit height so the
-   range input's absolute positioning gets the full 20px to work with. */
-.graph-animation-controller-big-bar-track {
-  position: relative;
+/* Progress slider — plain flow range input, same pattern as speed slider.
+   No position tricks needed; Obsidian's native range styling handles everything. */
+.graph-animation-controller-big-bar-slider {
   flex: 1 1 auto;
-  height: 20px;          /* hit area height — range input fills this */
+  width: 100%;
   cursor: pointer;
-}
-
-/* Visual groove: a thin bar centered inside the hit area via top/transform */
-.graph-animation-controller-big-bar-track::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 4px;
-  border-radius: 2px;
-  background: var(--background-modifier-border);
-  pointer-events: none;
-  transition: height 80ms ease;
-}
-
-.graph-animation-controller-big-bar-track:hover::before {
-  height: 6px;
-}
-
-.graph-animation-controller-big-bar-fill {
-  position: absolute;
-  left: 0;
-  right: auto;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 4px;
-  border-radius: 2px;
-  background: var(--interactive-accent);
-  width: 0%;
-  pointer-events: none;
-  transition: height 80ms ease;
-}
-
-.graph-animation-controller-big-bar-track:hover .graph-animation-controller-big-bar-fill {
-  height: 6px;
-}
-
-/* Range input: covers the full 20px hit area so both click and drag work.
-   !important on height/width overrides Obsidian's global input[type=range] rule
-   which sets height: var(--slider-track-height) = 4px. */
-.graph-animation-controller-big-bar-input {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 20px;
-  opacity: 0;
-  cursor: pointer;
-  margin: 0;
-  padding: 0;
 }
 
 /* Percent wrap: fixed-size box — span and input are both absolutely positioned
@@ -407,9 +384,11 @@
   position: absolute;
   inset: 0;
   width: 100%;
-  height: 100%;          /* fills the 22px wrap exactly */
-  padding: 0 4px;        /* override Obsidian's 4px 8px default */
+  height: 22px !important;
+  min-height: 0;
+  padding: 0 4px !important;  /* override Obsidian's 4px 8px default */
   box-sizing: border-box;
+  line-height: 20px;
   text-align: right;
   font-size: var(--font-ui-smaller);
   visibility: hidden;

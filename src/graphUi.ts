@@ -13,6 +13,7 @@ type GraphUiRecord = {
   readonly controls: GraphControls
   readonly overlay: ReturnType<typeof createOverlay>
   readonly bigProgressBar: BigProgressBar
+  readonly cleanup: () => void
   readonly intervalId: number
   lastState: string
   bigProgressBarOpen: boolean
@@ -46,6 +47,7 @@ export class GraphUiController {
     const overlay = createOverlay(rootEl)
     const controls = createControls(rootEl)
     const bigProgressBar = createBigProgressBar(rootEl)
+    let cleanup = (): void => undefined
 
     const record: GraphUiRecord = {
       leaf,
@@ -54,6 +56,7 @@ export class GraphUiController {
       controls,
       overlay,
       bigProgressBar,
+      cleanup: () => cleanup(),
       intervalId: window.setInterval(() => this.refreshLeaf(leaf), UPDATE_INTERVAL_MS),
       lastState: "",
       bigProgressBarOpen: false,
@@ -71,12 +74,13 @@ export class GraphUiController {
       this.refreshLeaf(leaf)
       releaseFocus(overlay.percentEl)
     })
-    rootEl.addEventListener("pointerdown", (event) => {
+    const handleRootPointerDown = (event: PointerEvent): void => {
       const target = event.target
       if (!(target instanceof Node)) return
       if (overlay.overlayEl.contains(target) || overlay.positionPopoverEl.contains(target)) return
       overlay.positionPopoverEl.removeClass("is-open")
-    })
+    }
+    rootEl.addEventListener("pointerdown", handleRootPointerDown)
     overlay.progressionSliderEl.addEventListener("input", () => {
       const percent = Number.parseInt(overlay.progressionSliderEl.value, 10)
       this.#engineController.setProgressPercent(engine, percent)
@@ -162,12 +166,25 @@ export class GraphUiController {
 
     // --- Big progress bar wiring ---
 
-    // Range input handles both click and drag natively via the "input" event.
-    // We DO NOT add a separate pointerdown on progressTrackEl — that would
-    // swallow the mousedown the range thumb needs to start a drag.
-    bigProgressBar.progressInputEl.addEventListener("input", () => {
-      const percent = Number.parseInt(bigProgressBar.progressInputEl.value, 10)
+    let resumeAfterScrub = false
+    bigProgressBar.progressSliderEl.addEventListener("pointerdown", () => {
+      resumeAfterScrub = engine._graphAnimationControllerPaused !== true && engine.progression > 0
+      if (resumeAfterScrub) {
+        this.#engineController.pause(engine)
+      }
+    })
+    bigProgressBar.progressSliderEl.addEventListener("input", () => {
+      const percent = Number.parseInt(bigProgressBar.progressSliderEl.value, 10)
+      this.#engineController.previewProgressPercent(engine, percent)
+      this.refreshLeaf(leaf)
+    })
+    bigProgressBar.progressSliderEl.addEventListener("change", () => {
+      const percent = Number.parseInt(bigProgressBar.progressSliderEl.value, 10)
       this.#engineController.setProgressPercent(engine, percent)
+      if (resumeAfterScrub) {
+        this.#engineController.play(engine)
+      }
+      resumeAfterScrub = false
       this.refreshLeaf(leaf)
     })
 
@@ -189,6 +206,7 @@ export class GraphUiController {
       this.#commitBigBarPercentInput(bigProgressBar, engine, leaf),
     )
 
+    cleanup = () => rootEl.removeEventListener("pointerdown", handleRootPointerDown)
     this.#records.set(leaf, record)
     this.refreshLeaf(leaf)
   }
@@ -234,6 +252,7 @@ export class GraphUiController {
     const record = this.#records.get(leaf)
     if (!record) return
     window.clearInterval(record.intervalId)
+    record.cleanup()
     record.overlay.overlayEl.remove()
     record.overlay.positionPopoverEl.remove()
     record.controls.controlsEl.remove()

@@ -3,9 +3,7 @@ import type { DateSnapshot } from "./types"
 
 export type BigProgressBar = {
   readonly barEl: HTMLElement
-  readonly progressTrackEl: HTMLElement
-  readonly progressFillEl: HTMLElement
-  readonly progressInputEl: HTMLInputElement
+  readonly progressSliderEl: HTMLInputElement
   readonly percentValueEl: HTMLSpanElement
   readonly percentInputEl: HTMLInputElement
   render(settings: GraphAnimationControllerSettings, snapshot: DateSnapshot | null, isPlaying: boolean): void
@@ -14,15 +12,12 @@ export type BigProgressBar = {
 export function createBigProgressBar(rootEl: HTMLElement): BigProgressBar {
   const barEl = rootEl.createDiv({ cls: "graph-animation-controller-big-bar" })
 
-  // Single row: [track……………………] [percent]
+  // Single row: [slider……………………] [percent]
   const rowEl = barEl.createDiv({ cls: "graph-animation-controller-big-bar-row" })
 
-  // Center: progress track
-  const progressTrackEl = rowEl.createDiv({ cls: "graph-animation-controller-big-bar-track" })
-  const progressFillEl = progressTrackEl.createDiv({ cls: "graph-animation-controller-big-bar-fill" })
-  // Range input sits on top of the visual track — handles both click and drag natively
-  const progressInputEl = progressTrackEl.createEl("input", {
-    cls: "graph-animation-controller-big-bar-input",
+  // Center: plain range input in flow (same pattern as speed slider — no absolute positioning)
+  const progressSliderEl = rowEl.createEl("input", {
+    cls: "graph-animation-controller-big-bar-slider",
     attr: { type: "range", min: "0", max: "100", step: "1", "aria-label": "Timeline position" },
   })
 
@@ -41,16 +36,13 @@ export function createBigProgressBar(rootEl: HTMLElement): BigProgressBar {
 
   return {
     barEl,
-    progressTrackEl,
-    progressFillEl,
-    progressInputEl,
+    progressSliderEl,
     percentValueEl,
     percentInputEl,
     render: (_settings, snapshot, _isPlaying) => {
       const percent = snapshot?.progressPercent ?? 0
-      progressFillEl.style.width = `${percent}%`
-      if (progressInputEl.value !== String(percent)) {
-        progressInputEl.value = String(percent)
+      if (progressSliderEl.value !== String(percent)) {
+        progressSliderEl.value = String(percent)
       }
 
       const percentText = `${percent}%`
